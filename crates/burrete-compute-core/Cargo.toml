@@ -9,7 +9,7 @@ description = "Deterministic CPU reference algorithms for MolComputeKit"
 
 [dependencies]
 burrete-compute-protocol = { path = "../burrete-compute-protocol" }
-sha2 = "0.10"
+sha2 = "0.11"
 
 [dev-dependencies]
 base64 = "0.22"
