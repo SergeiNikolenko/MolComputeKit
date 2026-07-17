@@ -288,7 +288,7 @@ if (metalLookup.status === 0 && metallibLookup.status === 0) {
     assert.ok(existsSync(resolve(generation, "conformer-optimize.v1.air")));
     assert.ok(existsSync(resolve(generation, "mmff-energy.v1.air")));
     assert.ok(existsSync(resolve(generation, "alignment-score.v1.air")));
-    assert.ok(existsSync(resolve(generation, "native-compute.v11.metallib")));
+    assert.ok(existsSync(resolve(generation, "native-compute.v20.metallib")));
     const metadataHash = createHash("sha256").update(readFileSync(metadataPath)).digest("hex");
     assert.equal(metadataHash, pointer.metadataSha256);
   } finally {

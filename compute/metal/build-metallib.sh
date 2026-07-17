@@ -54,7 +54,7 @@ mkdir -p -- "$1"
 output_dir="$(CDPATH= cd -- "$1" && pwd -P)"
 
 command -v xcrun >/dev/null 2>&1 || fail 'xcrun is required to build Metal assets'
-command -v bun >/dev/null 2>&1 || fail 'bun is required to write Metal build metadata'
+command -v node >/dev/null 2>&1 || fail 'Node.js is required to write Metal build metadata'
 [[ -x /usr/bin/shasum ]] || fail '/usr/bin/shasum is required'
 
 if ! metal_tool="$(xcrun --sdk macosx --find metal 2>/dev/null)" ||
@@ -276,7 +276,7 @@ METALLIB_TOOL_SHA256="$metallib_tool_sha256" \
 SDK_PATH="$sdk_path" \
 SDK_VERSION="$sdk_version" \
 SDK_BUILD_VERSION="$sdk_build_version" \
-  bun "$metadata_writer" "$metadata_file"
+  node "$metadata_writer" "$metadata_file"
 
 generation_name="$(basename "$stage_dir")"
 metadata_sha256="$(sha256 "$metadata_file")"
