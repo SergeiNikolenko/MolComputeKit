@@ -1,0 +1,12 @@
+{
+  "name": "molcompute-kit-contracts",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "test": "node tests/test-compute-schema-contract.mjs && node tests/test-metal-tanimoto-contract.mjs",
+    "test:schemas": "node tests/test-compute-schema-contract.mjs",
+    "test:metal-contracts": "node tests/test-metal-tanimoto-contract.mjs"
+  }
+}
+

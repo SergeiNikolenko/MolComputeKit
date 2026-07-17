@@ -1,0 +1,23 @@
+[package]
+name = "burrete-compute-metal"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+rust-version.workspace = true
+description = "Verified Apple Metal runtime for MolComputeKit"
+
+[dependencies]
+burrete-compute-core = { path = "../burrete-compute-core" }
+burrete-compute-protocol = { path = "../burrete-compute-protocol" }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+sha2 = "0.11"
+
+[target.'cfg(target_os = "macos")'.dependencies]
+metal = "0.33"
+objc = "0.2"
+
+[dev-dependencies]
+base64 = "0.22"
+tempfile = "3"

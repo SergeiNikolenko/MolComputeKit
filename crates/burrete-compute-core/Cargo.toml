@@ -1,0 +1,17 @@
+[package]
+name = "burrete-compute-core"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+rust-version.workspace = true
+description = "Deterministic CPU reference algorithms for MolComputeKit"
+
+[dependencies]
+burrete-compute-protocol = { path = "../burrete-compute-protocol" }
+sha2 = "0.10"
+
+[dev-dependencies]
+base64 = "0.22"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"

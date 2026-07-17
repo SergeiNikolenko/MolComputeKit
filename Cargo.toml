@@ -1,0 +1,16 @@
+[workspace]
+members = [
+  "crates/molcompute-kit",
+  "crates/molcompute-service",
+  "crates/burrete-compute-core",
+  "crates/burrete-compute-metal",
+  "crates/burrete-compute-protocol",
+]
+resolver = "2"
+
+[workspace.package]
+version = "0.1.0"
+edition = "2021"
+license = "MIT"
+repository = "https://github.com/SergeiNikolenko/MolComputeKit"
+rust-version = "1.87"

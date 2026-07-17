@@ -1,0 +1,16 @@
+[package]
+name = "molcompute-kit"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+rust-version.workspace = true
+description = "Native molecular compute SDK with deterministic CPU references and an Apple Metal backend"
+readme = "../../README.md"
+keywords = ["chemistry", "metal", "gpu", "molecular", "apple-silicon"]
+categories = ["science", "hardware-support"]
+
+[dependencies]
+burrete-compute-core = { path = "../burrete-compute-core", version = "0.1.0" }
+burrete-compute-metal = { path = "../burrete-compute-metal", version = "0.1.0" }
+burrete-compute-protocol = { path = "../burrete-compute-protocol", version = "0.1.0" }
