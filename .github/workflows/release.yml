@@ -11,13 +11,12 @@ jobs:
   source:
     runs-on: macos-14
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - uses: dtolnay/rust-toolchain@stable
       - run: cargo test --workspace
       - name: Create source archive
         run: git archive --format=tar.gz --prefix=MolComputeKit-${GITHUB_REF_NAME}/ -o MolComputeKit-${GITHUB_REF_NAME}.tar.gz HEAD
-      - uses: softprops/action-gh-release@v2
+      - uses: softprops/action-gh-release@v3
         with:
           files: MolComputeKit-${{ github.ref_name }}.tar.gz
           generate_release_notes: true
-
