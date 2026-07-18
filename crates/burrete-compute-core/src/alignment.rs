@@ -33,39 +33,64 @@ const ESP_B: [f64; 9] = [
 ];
 
 #[derive(Clone, Copy, Debug, PartialEq)]
+/// One atom's caller-supplied numerical parameters for alignment and scoring.
+///
+/// MolComputeKit does not derive these values from an element or molecular
+/// file. Probe and reference atoms must use the same parameterization.
 pub struct AlignmentAtom {
+    /// Cartesian `[x, y, z, padding]` coordinates.
+    ///
+    /// The calculation uses the first three lanes. Keep one length unit across
+    /// both molecules and set the reserved fourth lane to zero.
     pub position: [f32; 4],
+    /// Positive finite `alpha` in the shape term `exp(-alpha * r^2)`.
+    ///
+    /// Its unit is the inverse square of the coordinate unit.
     pub gaussian_exponent: f32,
+    /// Positive finite multiplier for the atom's Gaussian shape density.
     pub gaussian_amplitude: f32,
+    /// Finite partial charge used by the fixed electrostatic overlap kernel.
     pub partial_charge: f32,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq)]
+/// One unique, weighted probe-to-reference atom correspondence.
 pub struct AtomMapping {
+    /// Zero-based index into the probe atom slice.
     pub probe_atom: u32,
+    /// Zero-based index into the reference atom slice.
     pub reference_atom: u32,
+    /// Positive finite contribution to the fitted centroids and RMSD.
     pub weight: f32,
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
+/// Selects whether scoring preserves the input pose or fits a rigid transform.
 pub enum AlignmentMode {
+    /// Scores the input coordinates directly and requires an empty mapping.
     FixedPose,
+    /// Fits a weighted Horn transform from a non-empty, unique atom mapping.
     MappedHorn,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq)]
+/// Rigid row-vector transform from probe coordinates into reference space.
 pub struct RigidTransform {
     /// Row-vector rotation: `aligned = position * rotation + translation`.
     pub rotation: [[f32; 3]; 3],
+    /// Translation in the same length unit as the input coordinates.
     pub translation: [f32; 3],
 }
 
 impl RigidTransform {
+    /// Transform that leaves the first three coordinate lanes unchanged.
     pub const IDENTITY: Self = Self {
         rotation: [[1.0, 0.0, 0.0], [0.0, 1.0, 0.0], [0.0, 0.0, 1.0]],
         translation: [0.0; 3],
     };
 
+    /// Applies the transform to the first three lanes and returns zero padding.
+    #[must_use]
     pub fn apply(self, position: [f32; 4]) -> [f32; 4] {
         let point = [
             f64::from(position[0]),
@@ -84,25 +109,46 @@ impl RigidTransform {
 }
 
 #[derive(Clone, Copy, Debug, PartialEq)]
+/// Shape, electrostatic, and combined scores for one aligned pair.
 pub struct AlignmentScores {
+    /// Weighted RMSD in input coordinate units, or `None` for fixed-pose mode.
     pub rmsd: Option<f32>,
+    /// Unnormalized Gaussian cross-overlap.
     pub shape_overlap: f32,
+    /// Shape Tanimoto similarity in `[0, 1]`.
     pub shape_tanimoto: f32,
+    /// Shape Carbo similarity in `[0, 1]`.
     pub shape_carbo: f32,
+    /// Unnormalized electrostatic cross-overlap.
     pub electrostatic_overlap: f32,
+    /// Electrostatic Carbo similarity in `[-1, 1]`, or zero when unavailable.
     pub electrostatic_carbo: f32,
+    /// Electrostatic Tanimoto similarity in `[-1/3, 1]`, or zero when unavailable.
     pub electrostatic_tanimoto: f32,
+    /// Whether both molecules had enough self-overlap for electrostatic ratios.
     pub electrostatic_available: bool,
+    /// Shape/electrostatic combination in `[0, 1]`; shape-only when needed.
     pub combined_similarity: f32,
 }
 
 #[derive(Clone, Debug, PartialEq)]
+/// Fitted transform, scores, and transformed probe coordinates for one pair.
 pub struct AlignmentResult {
+    /// Transform applied to the probe.
     pub transform: RigidTransform,
+    /// Scores computed after applying `transform`.
     pub scores: AlignmentScores,
+    /// Probe positions in input order, transformed into reference space.
     pub aligned_probe_positions: Vec<[f32; 4]>,
 }
 
+/// Aligns and scores one probe/reference pair using explicit numerical inputs.
+///
+/// # Errors
+///
+/// Returns [`AlignmentError`] for empty atom lists, non-finite coordinates or
+/// charges, non-positive Gaussian parameters, an invalid mapping for the chosen
+/// mode, or non-finite numerical output.
 pub fn align_and_score(
     probe: &[AlignmentAtom],
     reference: &[AlignmentAtom],
@@ -524,6 +570,8 @@ pub struct AlignmentError {
 }
 
 impl AlignmentError {
+    /// Returns the human-readable validation or numerical error message.
+    #[must_use]
     pub fn message(&self) -> &str {
         &self.message
     }

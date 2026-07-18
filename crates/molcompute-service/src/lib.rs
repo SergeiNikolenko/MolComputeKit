@@ -2,6 +2,13 @@
 //!
 //! The v1 transport retains its original environment-variable and wire names
 //! for compatibility with existing Burrete hosts.
+//!
+//! Embedding applications normally use [`ComputeServiceClient`]. Launching the
+//! client performs an authenticated transport handshake. Call
+//! [`ComputeServiceClient::capabilities`] afterwards to learn whether the Metal
+//! package loaded and which operations are available. Numerical requests
+//! exchange bounded binary payloads over inherited file descriptors instead of
+//! serializing molecular arrays as JSON.
 
 mod semiempirical;
 mod service_conformer;
@@ -74,6 +81,11 @@ const SEMIEMPIRICAL_INPUT_HEADER_BYTES: u64 = 32;
 const SEMIEMPIRICAL_ATOM_BYTES: u64 = 32;
 const SEMIEMPIRICAL_OUTPUT_HEADER_BYTES: u64 = 72;
 
+/// Supervisor and typed client for a separately built `molcompute-service`
+/// executable.
+///
+/// The client restarts the helper once after a transport failure. A restarted
+/// helper must complete the handshake again before an operation is retried.
 pub struct ComputeServiceClient {
     executable: PathBuf,
     runtime_root: PathBuf,
@@ -110,6 +122,12 @@ impl std::fmt::Debug for ComputeServiceConnection {
 }
 
 impl ComputeServiceClient {
+    /// Launches the helper at `executable`, points it at `runtime_root`, and
+    /// completes the initial authenticated transport handshake.
+    ///
+    /// A successful handshake does not prove that the Metal package loaded.
+    /// Call [`Self::capabilities`] and admit the required operation before
+    /// dispatching numerical work.
     pub fn launch(executable: &Path, runtime_root: &Path) -> Result<Self, String> {
         Ok(Self {
             executable: executable.to_path_buf(),
@@ -118,10 +136,15 @@ impl ComputeServiceClient {
         })
     }
 
+    /// Returns the observed runtime, device, operation, precision, and resource
+    /// limits reported by the helper.
     pub fn capabilities(&self) -> Result<ComputeCapabilityReport, String> {
         self.with_transport_restart(|connection| connection.capabilities())
     }
 
+    /// Builds an exact threshold graph from packed 2,048-bit fingerprints.
+    ///
+    /// The returned integer is measured GPU time in milliseconds.
     pub fn build_tanimoto_graph(
         &self,
         job_id: Uuid,
@@ -134,6 +157,10 @@ impl ComputeServiceClient {
         })
     }
 
+    /// Aligns and scores a bounded batch.
+    ///
+    /// The result contains per-pair transforms and scores plus aggregate
+    /// measured GPU time. The host records protocol-level backend evidence.
     pub fn align_and_score(
         &self,
         job_id: Uuid,
@@ -145,6 +172,8 @@ impl ComputeServiceClient {
         })
     }
 
+    /// Evaluates a typed semiempirical molecule and returns the evaluation plus
+    /// measured GPU time in milliseconds.
     pub fn evaluate_semiempirical(
         &self,
         job_id: Uuid,
@@ -156,6 +185,7 @@ impl ComputeServiceClient {
         })
     }
 
+    /// Optimizes one or more conformers using host-supplied MMFF parameters.
     pub fn optimize_mmff(
         &self,
         job_id: Uuid,
@@ -169,6 +199,7 @@ impl ComputeServiceClient {
         })
     }
 
+    /// Initializes and optimizes conformers from host-supplied distance bounds.
     pub fn embed_distance_bounds(
         &self,
         job_id: Uuid,
@@ -190,6 +221,7 @@ impl ComputeServiceClient {
         })
     }
 
+    /// Optimizes host-supplied ETK geometry terms.
     pub fn optimize_etk(
         &self,
         job_id: Uuid,
@@ -211,6 +243,7 @@ impl ComputeServiceClient {
         })
     }
 
+    /// Checks chiral-volume and tetrahedral constraints for a conformer batch.
     pub fn validate_stereo(
         &self,
         job_id: Uuid,
@@ -645,6 +678,11 @@ impl Drop for ComputeServiceConnection {
     }
 }
 
+/// Runs the helper process protocol on the inherited control and exchange
+/// channels.
+///
+/// Applications should spawn the packaged binary through [`ComputeServiceClient`]
+/// instead of calling this function in their UI process.
 pub fn run_compute_service() -> Result<(), String> {
     let runtime_root = parse_runtime_root()?;
     let session_token = SessionToken::new(

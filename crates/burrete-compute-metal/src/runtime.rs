@@ -29,6 +29,10 @@ use crate::{
 const MAX_DISPATCH_MS: u32 = 2_000;
 
 #[derive(Clone)]
+/// Loaded, integrity-checked Metal package bound to one observed GPU device.
+///
+/// Construct with [`Self::load`]. On unsupported platforms the public API still
+/// compiles, but loading returns [`MetalRuntimeError::UnsupportedPlatform`].
 pub struct MetalComputeRuntime {
     host: Arc<MetalHost>,
     runtime_identity: RuntimeIdentity,
@@ -118,21 +122,34 @@ pub struct MetalMmffOptimization {
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
+/// Slice ranges and alignment mode for one pair in a flattened Metal batch.
 pub struct AlignmentPairDescriptor {
+    /// First probe atom in [`MetalAlignmentBatch::probe_atoms`].
     pub probe_atom_start: u64,
+    /// Number of probe atoms in this pair.
     pub probe_atom_count: u64,
+    /// First reference atom in [`MetalAlignmentBatch::reference_atoms`].
     pub reference_atom_start: u64,
+    /// Number of reference atoms in this pair.
     pub reference_atom_count: u64,
+    /// First mapping entry in [`MetalAlignmentBatch::mappings`].
     pub mapping_start: u64,
+    /// Number of mapping entries in this pair.
     pub mapping_count: u64,
+    /// Fixed-pose or mapped Horn behavior for this pair.
     pub mode: AlignmentMode,
 }
 
 #[derive(Clone, Copy, Debug)]
+/// Flattened atom, mapping, and pair arrays for one bounded Metal dispatch.
 pub struct MetalAlignmentBatch<'a> {
+    /// Concatenated probe atom slices referenced by `pairs`.
     pub probe_atoms: &'a [AlignmentAtom],
+    /// Concatenated reference atom slices referenced by `pairs`.
     pub reference_atoms: &'a [AlignmentAtom],
+    /// Concatenated mapping slices referenced by `pairs`.
     pub mappings: &'a [AtomMapping],
+    /// Ordered descriptors; output pair order matches this slice.
     pub pairs: &'a [AlignmentPairDescriptor],
 }
 
@@ -143,8 +160,11 @@ pub struct MetalAlignmentPairResult {
 }
 
 #[derive(Clone, Debug, PartialEq)]
+/// Per-pair alignment output plus aggregate measured GPU duration.
 pub struct MetalAlignmentExecution {
+    /// Transforms and scores in descriptor order.
     pub pairs: Vec<MetalAlignmentPairResult>,
+    /// Sum of completed Metal command-buffer GPU intervals in milliseconds.
     pub gpu_time_ms: u64,
 }
 
@@ -246,6 +266,21 @@ impl std::fmt::Debug for MetalComputeRuntime {
 }
 
 impl MetalComputeRuntime {
+    /// Verifies and loads the current runtime generation under `runtime_root`.
+    ///
+    /// `helper_sha256` is a coordinator-supplied provenance identity. This
+    /// method validates its lowercase SHA-256 syntax and records it, but does
+    /// not read or hash the executable. The caller must measure the exact host
+    /// or helper binary through a trusted packaging step.
+    ///
+    /// Loading verifies package metadata and compiled source contracts, checks
+    /// device memory admission, and runs CPU/Metal startup known-answer tests.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`MetalRuntimeError`] when the identity or package is invalid,
+    /// Metal is unavailable, the device is below minimum limits, or a startup
+    /// parity check fails.
     pub fn load(runtime_root: &Path, helper_sha256: &str) -> Result<Self, MetalRuntimeError> {
         validate_sha256(helper_sha256)?;
         let package = verify_runtime_package(runtime_root)?;
@@ -278,18 +313,29 @@ impl MetalComputeRuntime {
         Ok(runtime)
     }
 
+    /// Returns the verified package identities plus the caller-supplied
+    /// executable digest recorded at load time.
+    #[must_use]
     pub fn runtime_identity(&self) -> &RuntimeIdentity {
         &self.runtime_identity
     }
 
+    /// Returns the GPU device observed while loading this runtime.
+    #[must_use]
     pub fn device_identity(&self) -> &GpuDeviceIdentity {
         &self.device_identity
     }
 
+    /// Returns the limits admitted for this runtime and observed device.
+    #[must_use]
     pub fn limits(&self) -> &CapabilityLimits {
         &self.limits
     }
 
+    /// Builds an exact bounded threshold graph from packed fingerprints.
+    ///
+    /// Use [`Self::build_graph_profiled`] when the host must retain measured GPU
+    /// time as backend evidence.
     pub fn build_graph(
         &self,
         fingerprints: &[Fingerprint2048],
@@ -299,6 +345,7 @@ impl MetalComputeRuntime {
         self.host.build_graph(fingerprints, cutoff, options)
     }
 
+    /// Builds an exact threshold graph and returns measured GPU duration.
     pub fn build_graph_profiled(
         &self,
         fingerprints: &[Fingerprint2048],
@@ -314,6 +361,10 @@ impl MetalComputeRuntime {
         })
     }
 
+    /// Scores one packed fingerprint against a bounded library exactly.
+    ///
+    /// The returned intersection/union counts preserve exact threshold
+    /// semantics. Use [`Self::score_query_profiled`] for measured GPU time.
     pub fn score_query(
         &self,
         query: &Fingerprint2048,
@@ -323,6 +374,7 @@ impl MetalComputeRuntime {
         self.host.score_query(query, fingerprints, options)
     }
 
+    /// Scores a query exactly and returns measured GPU duration.
     pub fn score_query_profiled(
         &self,
         query: &Fingerprint2048,
@@ -338,6 +390,11 @@ impl MetalComputeRuntime {
         })
     }
 
+    /// Aligns a bounded flattened batch and returns aggregate measured GPU time.
+    ///
+    /// Pair outputs contain transforms and scores, not protocol provenance. The
+    /// host binds this execution to the admitted plan and records stage-level
+    /// backend evidence separately.
     pub fn align_and_score_profiled(
         &self,
         batch: MetalAlignmentBatch<'_>,
