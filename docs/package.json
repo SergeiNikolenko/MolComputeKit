@@ -20,7 +20,7 @@
   },
   "devDependencies": {
     "pagefind": "1.5.2",
-    "typescript": "5.9.3"
+    "typescript": "7.0.2"
   },
   "overrides": {
     "@theguild/remark-mermaid": "0.3.0",
