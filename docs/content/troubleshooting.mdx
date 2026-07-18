@@ -1,0 +1,119 @@
+---
+title: Troubleshooting
+description: Diagnose dependency, input, resource, Metal package, capability, and helper failures.
+---
+
+# Troubleshooting
+
+Start by identifying the failing layer: chemistry preparation, typed CPU input,
+Metal package verification, capability admission, helper transport, or artifact
+validation. Errors at those boundaries have different remedies.
+
+## Cargo follows unexpected code
+
+**Symptom:** behavior changes after a dependency update even though your
+application code did not.
+
+**Check:** ensure the Git dependency uses a release `tag` or immutable `rev`.
+Do not consume unpinned `main` in a released application.
+
+## “Where is the SMILES API?”
+
+There is no high-level `from_smiles` API in the facade. Parse and standardize
+molecules in the host, generate chemistry-aware inputs with a recorded engine,
+then call MolComputeKit with typed numerical data. See
+[Architecture](./concepts/architecture).
+
+## A request is rejected before calculation
+
+Check explicit resource bounds first. Memory, edge, record, dispatch-time, and
+control-frame limits are contracts. For a similarity graph, remember that
+`max_edges` counts qualifying unordered pairs, not the two directed CSR
+entries.
+
+Do not “fix” a rejection by replacing a bounded option with an unlimited
+allocation. Estimate or partition the workload and retain the chosen limits in
+the request evidence.
+
+## `RuntimeMissing` or integrity errors
+
+Verify that the packaged runtime root contains `current.json` and the exact
+generation it names. Do not edit generated metadata or `.metallib` files by
+hand. Re-run:
+
+```bash
+compute/metal/build-metallib.sh compute/metal/runtime
+```
+
+Then package the entire published output without changing bytes. A source,
+contract, compiler, AIR, metadata, or library hash mismatch is a package
+integrity failure, not a warning.
+
+## Metal is unavailable
+
+Confirm all of the following:
+
+- macOS 14 or newer
+- Apple Silicon architecture
+- a loadable Metal device
+- admitted device working-set size
+- a verified runtime package with all required entry points
+- successful startup known-answer tests
+
+An unsupported platform uses the compile-time stub and must report Metal as
+unavailable. Choose `ReferenceCpu`, allow an explicit `GpuPreferred` fallback,
+or reject a `GpuRequired` request.
+
+## Capability report validation fails
+
+Do not patch the report after the handshake. Compare it with the protocol
+rules:
+
+- `Available` requires runtime, device, only available capabilities, and no
+  reasons;
+- `Degraded` requires a runtime, a mix of capability outcomes, and reasons;
+- `Unavailable` requires no available capability, zero execution limits, and at
+  least one report-level reason;
+- available Native Metal capability requires a Metal-library hash;
+- each unavailable capability requires a reason code present in the report.
+
+For a helper, also check `verify_against()` with coordinator-owned expected
+runtime identity and maximum limits.
+
+## Helper handshake or transport fails
+
+Check that the host launched the exact intended executable and runtime root.
+The v1 environment names retain `BURRETE_COMPUTE_*` for compatibility. Do not
+manually reuse session or per-job capability tokens.
+
+`ComputeServiceClient` performs one restart after a transport failure and
+repeats the authenticated handshake. If the retry fails, preserve both errors
+and stop the operation rather than accepting a partial binary exchange.
+
+## A calculation returns but did not converge
+
+Execution success and scientific convergence are separate. Inspect SCF or
+optimizer status, iteration count, per-record status, and any failure code.
+Publish partial failures explicitly; do not convert them into an unconditional
+success banner.
+
+## JSON passes schema but Rust rejects it
+
+This is expected for cross-field invariants that JSON Schema cannot express.
+Use the Rust error to identify the violated identity, order, byte range, state
+transition, or canonical hash. Do not weaken the Rust check to match the
+structural prefilter. See [Protocol and schemas](./reference/protocol-schemas).
+
+## Still stuck?
+
+Collect the smallest reproducible input plus:
+
+- MolComputeKit, protocol, and Metal runtime versions from `framework_info()`;
+- OS and architecture;
+- requested policy and resource limits;
+- actual capability report or CPU path;
+- runtime, helper, and Metal-library hashes when applicable;
+- exact error and convergence status.
+
+Exclude proprietary molecule contents when identities, sizes, and a minimized
+fixture are sufficient to reproduce the boundary failure.

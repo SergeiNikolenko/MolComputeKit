@@ -22,7 +22,9 @@ or database adapters outside the framework.
 Dense numerical work runs on Metal when the verified runtime and memory plan
 admit it. Sequential policy, chemistry perception, validation, and publication
 remain on the host when moving them to the GPU would reduce correctness or add
-no useful parallelism. A mixed pipeline must report `Mixed`, never `GPU`.
+no useful parallelism. Execution plans and result provenance report the actual
+backend of every stage; a host must not collapse a multi-stage pipeline into a
+single `GPU` claim.
 
 Examples include deterministic Butina representative selection after Metal CSR
 construction and RDKit topology/parameter extraction before Metal DG/ETK/MMFF.

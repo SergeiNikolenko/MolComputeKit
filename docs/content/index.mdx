@@ -1,0 +1,47 @@
+---
+title: Overview
+description: Deterministic CPU references, verified Apple Metal execution, and bounded molecular-compute contracts.
+---
+
+# MolComputeKit
+
+MolComputeKit is a native Rust SDK for **molecular numerical workloads**. It
+pairs portable reference implementations with a hash-verified Apple Metal
+runtime and a versioned protocol for jobs, capabilities, artifacts, and helper
+processes.
+
+It is intentionally not a cheminformatics application. You provide typed,
+chemistry-aware inputs such as packed fingerprints, atom coordinates, distance
+constraints, or MMFF parameters. MolComputeKit validates and computes over
+those inputs. Your host remains responsible for parsing SMILES/SDF files,
+chemical perception, persistence, UI, and result presentation.
+
+## Choose a path
+
+| If you want to… | Read… |
+| --- | --- |
+| add a pinned dependency | [Installation](./getting-started/installation) |
+| run a deterministic calculation now | [CPU quick start](./getting-started/quick-start) |
+| understand which module owns a task | [Architecture](./concepts/architecture) |
+| make truthful CPU/GPU claims | [Backend evidence](./concepts/backend-evidence) |
+| copy complete examples | [CPU examples](./guides/examples) |
+| package and verify Metal kernels | [Metal runtime](./guides/metal-runtime) |
+| find a public Rust entry point | [API map](./reference/api-map) |
+| validate wire objects and artifacts | [Protocol and schemas](./reference/protocol-schemas) |
+| diagnose a failure | [Troubleshooting](./troubleshooting) |
+
+## What runs where
+
+| Surface | Purpose | Availability |
+| --- | --- | --- |
+| `molcompute_kit::core` | deterministic CPU/reference algorithms | Linux and macOS |
+| `molcompute_kit::protocol` | bounded requests, plans, evidence, and artifacts | Linux and macOS |
+| `molcompute_kit::metal` | verified native Metal execution | macOS 14+ on Apple Silicon |
+| `molcompute-service` | authenticated, out-of-process Metal execution | macOS 14+ on Apple Silicon |
+
+The repository does not include a prebuilt Metal library or signed helper.
+Applications that use the GPU path must build, package, hash, and ship those
+artifacts themselves.
+
+Start with [installation](./getting-started/installation) or run the
+[CPU quick start](./getting-started/quick-start).

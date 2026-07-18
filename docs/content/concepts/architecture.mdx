@@ -1,0 +1,59 @@
+---
+title: Architecture
+description: Understand the chemistry, numerical, runtime, and protocol boundaries in MolComputeKit.
+---
+
+# Architecture
+
+MolComputeKit separates chemistry decisions from numerical execution. That
+boundary makes CPU/Metal parity testable and keeps result provenance explicit.
+
+## The four layers
+
+| Layer | Owns | Does not own |
+| --- | --- | --- |
+| host or adapter | parsing, standardization, chemistry perception, fingerprint and force-field parameter generation | numerical kernel implementation |
+| `core` | deterministic CPU/reference algorithms and typed numerical validation | file parsing or UI |
+| `metal` or `molcompute-service` | verified GPU kernels, device limits, measured dispatch evidence | deciding chemical meaning |
+| `protocol` | bounded requests, plans, state transitions, hashes, packs, capabilities, and artifacts | executing a calculation |
+
+The `molcompute-kit` facade re-exports the three library layers as
+`molcompute_kit::core`, `molcompute_kit::metal`, and
+`molcompute_kit::protocol`.
+
+## A typical flow
+
+1. **Prepare chemistry.** The host parses the molecule and records the engine
+   and settings that produced fingerprints, distance constraints, MMFF terms,
+   or atom coordinates.
+2. **Freeze identity.** The host assigns stable input identities and constructs
+   validated protocol objects or typed core inputs.
+3. **Select policy.** The request declares `GpuRequired`, `GpuPreferred`, or
+   `ReferenceCpu`; it does not declare what actually ran.
+4. **Execute.** A CPU reference, direct Metal runtime, or authenticated helper
+   performs the bounded numerical work.
+5. **Publish evidence.** Each numerical stage records its requested and
+   effective backend, engine/runtime identity, precision, timing, hashes, and
+   fallback decision.
+
+## Why there is no `from_smiles` facade
+
+SMILES-to-number conversion depends on choices that materially affect results:
+aromaticity, protonation, stereochemistry, conformer generation, fingerprint
+radius, MMFF variant, and parameter availability. Hiding those choices inside a
+convenience method would make results harder to reproduce.
+
+The optional source under `compute/rdkit-conformer` demonstrates how to extract
+DG/ETK constraints and MMFF parameters from RDKit. Another adapter is valid if
+it emits the same validated contracts and records its own chemistry-engine
+identity.
+
+## Compatibility names
+
+The first standalone release was extracted from Burrete. Persisted v1 schema,
+wire, kernel, and environment identifiers therefore retain their
+`burrete.*`/`BURRETE_COMPUTE_*` spelling. These strings are compatibility
+contracts, not a signal that the standalone API is private.
+
+For the detailed implementation record, read the repository's
+[`docs/ARCHITECTURE.md`](https://github.com/SergeiNikolenko/MolComputeKit/blob/main/docs/ARCHITECTURE.md).

@@ -11,8 +11,10 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     for (index, value) in counts.iter().enumerate() {
         println!(
-            "record={index} intersection={} union={}",
-            value.intersection, value.union
+            "record={index} similarity={:.3} intersection={} union={}",
+            value.similarity(),
+            value.intersection,
+            value.union
         );
     }
     Ok(())

@@ -1,0 +1,83 @@
+---
+title: Installation
+description: Add a pinned MolComputeKit release and verify the portable CPU path.
+---
+
+# Installation
+
+MolComputeKit is a Rust workspace. Most applications should depend on the
+`molcompute-kit` facade instead of selecting internal crates individually.
+
+## Requirements
+
+- Rust 1.87 or newer and Cargo
+- Git access to the repository
+- macOS 14+ on Apple Silicon only if you need Metal execution
+- the Xcode Metal Toolchain only if you build the runtime package
+
+The CPU/reference algorithms and protocol types also build on Linux. Python,
+MLX, and RDKit are not runtime dependencies of the public Rust facade.
+
+## Add the dependency
+
+Pin a release tag so your build does not silently change when `main` advances:
+
+```toml filename="Cargo.toml"
+[dependencies]
+molcompute-kit = { git = "https://github.com/SergeiNikolenko/MolComputeKit", tag = "v0.1.0" }
+```
+
+For a local checkout while contributing:
+
+```toml filename="Cargo.toml"
+[dependencies]
+molcompute-kit = { path = "../MolComputeKit/crates/molcompute-kit" }
+```
+
+The path form is useful during development, but it is not a reproducible
+release dependency unless the surrounding workspace pins that checkout.
+
+## Verify the current source tree
+
+Clone the repository and run the smallest public example:
+
+```bash
+git clone https://github.com/SergeiNikolenko/MolComputeKit.git
+cd MolComputeKit
+cargo run -p molcompute-kit --example cpu_similarity
+```
+
+Expected output:
+
+```text
+record=0 similarity=1.000 intersection=2048 union=2048
+record=1 similarity=0.000 intersection=0 union=2048
+```
+
+This test does not need a GPU, a Metal package, RDKit, or the helper process.
+It follows the current source tree so its output matches these docs. The
+`v0.1.0` tag contains an earlier version of this one example, without the
+derived `similarity` column.
+
+## Optional components
+
+Build the authenticated helper only when your application needs out-of-process
+Metal execution:
+
+```bash
+cargo build --release -p molcompute-service
+```
+
+Build the Metal package only on a supported Mac with the Xcode Metal Toolchain:
+
+```bash
+compute/metal/build-metallib.sh compute/metal/runtime
+```
+
+The generated runtime directory is an application resource, not a Cargo
+dependency. Read [Metal runtime](../guides/metal-runtime) before packaging it.
+
+## Next step
+
+Continue with the [CPU quick start](./quick-start) to see the public facade and
+the input boundary in a complete program.

@@ -1,0 +1,144 @@
+---
+title: Metal runtime
+description: Build, verify, load, and package MolComputeKit kernels on Apple Silicon.
+---
+
+# Metal runtime
+
+Metal execution is an application-packaged capability. MolComputeKit ships
+reviewed `.metal` source and kernel contracts, but it does not ship a prebuilt
+`.metallib` or signed `molcompute-service` binary.
+
+## 1. Build a generation
+
+On macOS 14+ with the Xcode Metal Toolchain installed:
+
+```bash
+xcodebuild -downloadComponent MetalToolchain
+compute/metal/build-metallib.sh compute/metal/runtime
+```
+
+The script compiles the reviewed sources, hashes sources, contracts, compiler,
+linker, AIR files, metadata, and final library, then publishes a generation
+through `current.json`. Treat the output directory as a read-only application
+resource.
+
+## 2. Load the verified package
+
+```rust
+use std::path::Path;
+
+use molcompute_kit::metal::MetalComputeRuntime;
+
+fn load_runtime(
+    helper_sha256: &str,
+) -> Result<MetalComputeRuntime, Box<dyn std::error::Error>> {
+    Ok(MetalComputeRuntime::load(
+        Path::new("Resources/compute/metal/runtime"),
+        helper_sha256,
+    )?)
+}
+```
+
+The caller must measure the exact host or helper executable and obtain
+`helper_sha256` from a trusted packaging step. `load` checks that the supplied
+identity is a lowercase SHA-256 string and records it; it does **not** read the
+executable or prove that the digest matches its bytes. The service helper hashes
+its own executable before loading the runtime.
+
+`load` then verifies the generation pointer and metadata hashes, checks the
+package against source and kernel contracts compiled into the crate, creates
+the Metal device/runtime, admits the device memory limit, and runs startup
+known-answer tests.
+
+Do not catch an integrity error and continue with the same package. Rebuild or
+restore the exact expected resource instead.
+
+## 3. Retain observed identity
+
+After loading, retain:
+
+```rust
+use molcompute_kit::metal::MetalComputeRuntime;
+
+fn retain_observed_identity(runtime: &MetalComputeRuntime) {
+    let runtime_identity = runtime.runtime_identity();
+    let device_identity = runtime.device_identity();
+    let limits = runtime.limits();
+
+    // Persist or attach these values to the host's result provenance.
+    println!("runtime={runtime_identity:?}");
+    println!("device={device_identity:?}");
+    println!("limits={limits:?}");
+}
+```
+
+The identity binds the runtime metadata, helper, and Metal library hashes. The
+limits describe what this observed device admitted, not a global promise for
+all Apple Silicon machines.
+
+## 4. Choose direct or helper execution
+
+Use direct `MetalComputeRuntime` calls when the host intentionally runs kernels
+in process. Use the separately built `molcompute-service` for isolation of
+long-running or untrusted jobs.
+
+The helper client is a separate package, so add it explicitly when embedding
+the library side of the service:
+
+```toml filename="Cargo.toml"
+[dependencies]
+molcompute-kit = { git = "https://github.com/SergeiNikolenko/MolComputeKit", tag = "v0.1.0" }
+molcompute-service = { git = "https://github.com/SergeiNikolenko/MolComputeKit", tag = "v0.1.0" }
+```
+
+```rust
+use std::path::Path;
+
+use molcompute_kit::protocol::{CapabilityExpectation, ComputeAvailability};
+use molcompute_service::ComputeServiceClient;
+
+fn launch_fully_available_client(
+    expected: &CapabilityExpectation,
+) -> Result<ComputeServiceClient, Box<dyn std::error::Error>> {
+    let client = ComputeServiceClient::launch(
+        Path::new("Helpers/molcompute-service"),
+        Path::new("Resources/compute/metal/runtime"),
+    )?;
+    let report = client.capabilities()?;
+
+    // `verify_against` also validates the report's internal invariants.
+    report.verify_against(expected)?;
+    if report.availability != ComputeAvailability::Available {
+        return Err(std::io::Error::other(format!(
+            "Metal runtime is not fully available: {:?}",
+            report.reasons
+        ))
+        .into());
+    }
+
+    Ok(client)
+}
+```
+
+Construct `CapabilityExpectation` from coordinator-owned platform, runtime,
+helper, Metal-library, and maximum-limit identities before launching the
+process. The example deliberately requires a fully `Available` runtime. A host
+that accepts `Degraded` must separately admit the exact capability needed for
+the next operation.
+
+Launching the client performs an authenticated transport handshake, but a
+successful handshake does not mean the Metal package loaded. Numerical arrays
+use bounded binary exchanges over inherited file descriptors rather than
+unbounded JSON payloads. The client retries one transport failure by launching
+a new helper and repeating the handshake.
+
+## 5. Treat unsupported systems honestly
+
+On an unsupported platform the stub backend compiles, but Metal is unavailable.
+That is useful for portable protocol and CPU builds; it is not a simulated GPU.
+Use a CPU policy or reject a GPU-required request and publish the corresponding
+reason.
+
+See [Backend evidence](../concepts/backend-evidence) for the fields a host
+should publish with each result.

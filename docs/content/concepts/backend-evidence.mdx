@@ -1,0 +1,84 @@
+---
+title: Backend evidence
+description: Report requested policy, observed execution, precision, fallback, and runtime identity without overclaiming GPU use.
+---
+
+# Backend evidence
+
+A configuration such as “prefer GPU” is an intention. It is not evidence that
+a GPU kernel ran.
+
+## Policy versus observation
+
+`BackendPolicy` controls admission and fallback:
+
+| Policy | Meaning |
+| --- | --- |
+| `GpuRequired` | reject the operation if the required Metal capability is unavailable |
+| `GpuPreferred` | use Metal when admitted; otherwise record a bounded CPU fallback |
+| `ReferenceCpu` | use the deterministic reference backend |
+
+An `ExecutionPlan` records the requested and admitted route per stage and
+partition:
+
+- `requested_backend`
+- `effective_backend`
+- `precision`
+- `engine`
+- `fallback`, when requested and effective backends differ
+
+The plan is not proof that a stage ran. After execution, a successful
+`StageSnapshot` and matching `StageProvenance` record the observed device,
+kernel, host/GPU timing, transferred bytes, and final backend evidence.
+
+The valid `Backend` values are `Coordinator`, `Rdkit`, `NativeMetal`, and
+`ReferenceCpu`. A workflow may legitimately use several of them: for example,
+RDKit can prepare fingerprints, Metal can build neighbors, and the reference
+CPU can apply deterministic clustering semantics. Report each stage instead of
+inventing one aggregate “GPU” label.
+
+## Capability reports
+
+`ComputeCapabilityReport` represents the runtime reported by the helper in a
+separate request after the authenticated handshake. Its top-level availability
+has strict meaning:
+
+- `Available`: every advertised capability is available and runtime/device
+  identities are present;
+- `Degraded`: the runtime has a mix of available and unavailable capabilities,
+  with reasons;
+- `Unavailable`: no capability is advertised as available, execution limits
+  are zero, and at least one report-level reason explains why.
+
+An available `NativeMetal` capability also requires a pinned Metal-library
+SHA-256. A coordinator should call `validate()` and, for an untrusted helper,
+`verify_against()` using identities and maximum limits that the coordinator
+owns.
+
+## Evidence to retain
+
+For each published numerical result, retain at least:
+
+- requested and effective backend;
+- runtime and engine versions plus manifest hashes;
+- Metal library and helper hashes when applicable;
+- observed GPU device identity;
+- precision policy;
+- host and GPU timing where provided;
+- fallback code and human-readable reason;
+- input, plan, result, and artifact hashes;
+- convergence and per-record failure state.
+
+Avoid fields such as `gpu: true`. They cannot distinguish a request from an
+execution, a partial workflow from an all-GPU workflow, or a verified package
+from an unpinned binary.
+
+## Fallback is explicit
+
+Protocol validation forbids fallback metadata when requested and effective
+backends match, and requires it when they differ. A silent fallback is an
+invalid plan.
+
+Use `GpuRequired` when falling back would violate the caller's scientific or
+operational requirements. Use `GpuPreferred` only when a recorded reference-CPU
+result is acceptable.

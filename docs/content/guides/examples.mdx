@@ -1,0 +1,134 @@
+---
+title: CPU examples
+description: Run similarity, clustering, alignment, and RM1 calculations without a Metal runtime.
+---
+
+# CPU examples
+
+The current source tree includes four examples that run entirely through
+`molcompute_kit::core`. They are small enough to read in one sitting and use the
+same public types an embedding application uses.
+
+The latest tagged release, `v0.1.0`, contains only the original
+`cpu_similarity` example. Use the current source tree for all four commands on
+this page.
+
+Run all four from the repository root:
+
+```bash
+cargo run -p molcompute-kit --example cpu_similarity
+cargo run -p molcompute-kit --example cpu_clustering
+cargo run -p molcompute-kit --example cpu_alignment
+cargo run -p molcompute-kit --example cpu_semiempirical
+```
+
+## Exact Tanimoto similarity
+
+[`cpu_similarity.rs`](https://github.com/SergeiNikolenko/MolComputeKit/blob/main/crates/molcompute-kit/examples/cpu_similarity.rs)
+compares one canonical packed fingerprint with a small library. The API returns
+integer intersection and union counts; `similarity()` is a display helper.
+
+```rust
+let query = Fingerprint2048::from_words([u64::MAX; 32]);
+let library = [query, Fingerprint2048::ZERO];
+let counts = score_tanimoto_query(
+    &query,
+    &library,
+    TanimotoQueryOptions::new(8 * 1024 * 1024)?,
+)?;
+```
+
+```text
+record=0 similarity=1.000 intersection=2048 union=2048
+record=1 similarity=0.000 intersection=0 union=2048
+```
+
+Use the counts, not rounded floating-point output, when applying exact
+threshold semantics.
+
+## Similarity graph and Butina clustering
+
+[`cpu_clustering.rs`](https://github.com/SergeiNikolenko/MolComputeKit/blob/main/crates/molcompute-kit/examples/cpu_clustering.rs)
+builds a bounded symmetric CSR graph and clusters it deterministically.
+
+```rust
+let graph = build_tanimoto_graph(
+    &fingerprints,
+    SimilarityCutoff {
+        numerator: 1,
+        denominator: 2,
+    },
+    GraphBuildOptions::from_resource_limits(tile_size, &limits)?,
+)?;
+let clusters = butina_clusters(
+    &graph,
+    ButinaOptions::from_resource_limits(&limits)?,
+)?;
+```
+
+```text
+vertices=3
+undirected_edges=1
+clusters=[[0, 1], [2]]
+```
+
+`max_edges` counts qualifying **unordered** pairs. The symmetric CSR stores two
+directed entries for each such edge. Both edge and memory bounds are validated
+before building the graph.
+
+## Rigid alignment and scores
+
+[`cpu_alignment.rs`](https://github.com/SergeiNikolenko/MolComputeKit/blob/main/crates/molcompute-kit/examples/cpu_alignment.rs)
+constructs two atom arrays related by a known rigid transform, supplies an
+explicit atom mapping, and runs mapped Horn alignment.
+
+```rust
+let result = align_and_score(
+    &probe,
+    &reference,
+    &mapping,
+    AlignmentMode::MappedHorn,
+)?;
+```
+
+```text
+rmsd=0.000003
+shape_tanimoto=1.000000
+combined_similarity=1.000000
+```
+
+Coordinates, Gaussian parameters, partial charges, and atom mapping are input
+data. MolComputeKit does not infer them from a molecular file.
+
+## RM1 semiempirical calculation
+
+[`cpu_semiempirical.rs`](https://github.com/SergeiNikolenko/MolComputeKit/blob/main/crates/molcompute-kit/examples/cpu_semiempirical.rs)
+evaluates a neutral water geometry with the default SCF options.
+
+```rust
+let water = SemiempiricalMolecule::rm1(atoms, 0)?;
+let result = evaluate_rm1(&water, SemiempiricalScfOptions::default())?;
+
+println!("status={:?}", result.scf.status);
+println!("total_energy_ev={:.9}", result.total_energy_ev);
+```
+
+A successful run reports `status=Converged`, ten iterations for this fixture,
+an energy near `-345.570511 eV`, and three atomic charges whose sum is near
+zero. In production, inspect `result.scf.status`; a returned numerical value is
+not by itself proof of convergence.
+
+For other supported method identities, use `SemiempiricalMolecule` and
+`evaluate_semiempirical`. The [API map](../reference/api-map) lists the public
+entry points.
+
+## What these examples intentionally omit
+
+They use small, explicit numerical inputs to make each calculation reviewable.
+Production hosts still need to:
+
+- prepare chemistry-aware inputs and record their provenance;
+- choose and enforce bounded resource limits;
+- persist execution and backend evidence;
+- handle per-record failures without treating partial success as full success;
+- validate artifacts before publishing them.

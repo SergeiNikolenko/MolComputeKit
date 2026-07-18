@@ -1,0 +1,134 @@
+---
+title: API map
+description: Find the public MolComputeKit module, type, or function for a calculation or integration task.
+---
+
+# API map
+
+Use this page to find an entry point, then rely on `cargo doc` for the complete
+signature and type-level documentation:
+
+```bash
+cargo doc --workspace --no-deps --open
+```
+
+The workspace form includes the three crates re-exported by the facade. Omit
+`--open` in CI or a non-GUI environment.
+
+## Facade and version identity
+
+| Need | Entry point |
+| --- | --- |
+| CPU/reference algorithms | `molcompute_kit::core` |
+| verified direct Metal runtime | `molcompute_kit::metal` |
+| jobs, capabilities, packs, and wire types | `molcompute_kit::protocol` |
+| bound framework/protocol/runtime versions | `framework_info() -> FrameworkInfo` |
+
+`framework_info()` reports compatibility identities. It does **not** probe the
+machine or prove Metal availability.
+
+## Fingerprints, graphs, and clustering
+
+| Task | Main types and functions |
+| --- | --- |
+| represent one canonical fingerprint | `Fingerprint2048` |
+| compare one query with a library | `score_tanimoto_query`, `TanimotoQueryOptions`, `TanimotoCounts` |
+| build a threshold graph | `build_tanimoto_graph`, `GraphBuildOptions`, `SymmetricCsr` |
+| cluster a graph | `butina_clusters`, `ButinaOptions` |
+| exact threshold | `protocol::SimilarityCutoff` |
+
+The graph builder returns symmetric CSR. Resource limits count each qualifying
+unordered pair once even though storage contains both directions.
+
+## Alignment and molecular scores
+
+| Task | Main types and functions |
+| --- | --- |
+| align and score one pair | `align_and_score` |
+| describe atoms | `AlignmentAtom` |
+| choose the algorithm | `AlignmentMode` |
+| provide a correspondence | `AtomMapping` |
+| inspect output | `AlignmentResult`, `RigidTransform`, `AlignmentScores` |
+
+The caller supplies coordinates, Gaussian parameters, partial charges, and any
+required atom mapping.
+
+## Conformers and MMFF
+
+| Task | Main types and functions |
+| --- | --- |
+| initialize deterministic positions | `initialize_conformer_positions` |
+| evaluate/optimize distance bounds | `evaluate_distance_constraints`, `optimize_distance_geometry` |
+| evaluate/optimize ETK terms | `evaluate_etk_geometry`, `optimize_etk_geometry` |
+| check stereochemistry constraints | `validate_conformer_stereo`, `validate_stereo_constraints` |
+| evaluate MMFF terms | `evaluate_mmff`, `evaluate_mmff_energy` |
+| optimize MMFF | `optimize_mmff` |
+| schedule bounded batches | `plan_conformer_batches` |
+
+Relevant input types include `DistanceConstraint`, `EtkGeometryTerms`,
+`ChiralVolumeConstraint`, `TetrahedralConstraint`, `MmffParameters`, and
+`DistanceGeometryOptimizationOptions`.
+
+The public numerical API does not infer these terms from SMILES. The optional
+`compute/rdkit-conformer` adapter is the reference extraction boundary.
+
+## Semiempirical methods
+
+| Task | Main types and functions |
+| --- | --- |
+| describe input | `SemiempiricalAtom`, `SemiempiricalMolecule`, `SemiempiricalMethod` |
+| select SCF behavior | `SemiempiricalScfOptions` |
+| evaluate by molecule method | `evaluate_semiempirical` |
+| explicit RM1 path | `evaluate_rm1` |
+| explicit PM6-family path | `evaluate_pm6` |
+| inspect result | `Rm1Evaluation`, `SemiempiricalScfResult`, `SemiempiricalScfStatus` |
+
+Check the SCF status and per-method applicability. Do not treat a finite energy
+alone as convergence evidence.
+
+## Direct Metal
+
+Start with `metal::MetalComputeRuntime::load`. The runtime exposes observed
+`runtime_identity()`, `device_identity()`, and `limits()`, followed by bounded
+calculation methods such as `score_query`, `build_graph`, and their profiled
+variants.
+
+Metal-specific batch/result types are public under `molcompute_kit::metal`.
+Their presence at compile time does not mean the current platform can execute
+them.
+
+## Helper service
+
+The `molcompute-service` package provides `ComputeServiceClient`. Its principal
+entry points are:
+
+- `launch`
+- `capabilities`
+- `build_tanimoto_graph`
+- `align_and_score`
+- `evaluate_semiempirical`
+- `embed_distance_bounds`
+- `optimize_etk`
+- `optimize_mmff`
+- `validate_stereo`
+
+Add the package explicitly when embedding the client library; it is not
+re-exported by the `molcompute-kit` facade.
+
+## Protocol
+
+Start with these groups:
+
+| Concern | Types |
+| --- | --- |
+| admission | `BackendPolicy`, `ResourceLimits`, workflow-specific submit requests |
+| plan/evidence | `ExecutionPlan`, `PlannedStage`, `ExecutionPartition`, `Backend`, `Precision`, `FallbackDecision` |
+| runtime observation | `ComputeCapabilityReport`, `CapabilityExpectation`, `RuntimeIdentity`, `GpuDeviceIdentity` |
+| lifecycle | `JobState`, `JobSnapshot`, `AttemptSnapshot`, `StageSnapshot` |
+| immutable data | `MolecularSnapshotManifest`, `EnginePackManifest`, `ResultPackManifest` |
+| publication | `ArtifactManifest`, `StageProvenance` |
+| helper transport | `SessionToken`, `JobCapabilityToken`, control/worker request and response types |
+
+Call each type's validator after decoding untrusted data. Read
+[Protocol and schemas](./protocol-schemas) before persisting or exchanging
+objects.
