@@ -1,0 +1,64 @@
+---
+title: Protocol and schemas
+description: Validate untrusted JSON structurally, then enforce cross-field invariants with Rust types.
+---
+
+# Protocol and schemas
+
+MolComputeKit uses JSON Schema 2020-12 at the untrusted JSON boundary and Rust
+validators as the semantic authority.
+
+## Two validation layers
+
+| Layer | Good at |
+| --- | --- |
+| `schemas/compute/**/*.schema.json` | field names, enums, primitive shapes, collection bounds, unknown-field rejection |
+| `burrete-compute-protocol` validators | UTF-8 byte bounds, ordering, uniqueness, arithmetic, cross-field identity, state transitions, canonical hashes |
+
+Passing a JSON Schema check is necessary but not sufficient. Decode into the
+corresponding Rust type and call `validate()` or a stronger relationship check
+such as `validate_against_job`, `validate_against_manifest`, or
+`verify_against`.
+
+## Main schema groups
+
+- `workflow-templates/cluster.v1.schema.json` — bounded cluster requests
+- `protocol/job-snapshot.v1.schema.json` — lifecycle and attempt state
+- `protocol/compute-capability-report.v1.schema.json` — observed runtime claims
+- `protocol/molecular-snapshot*.schema.json` — frozen molecular inputs
+- `protocol/engine-pack.v1.schema.json` — numeric engine inputs
+- `protocol/result-pack.v1.schema.json` — typed numeric outputs
+- `protocol/artifact-manifest.v1.schema.json` — publication and provenance
+- `protocol/control-envelope.v1.schema.json` — authenticated helper control
+
+The retained `burrete.*` schema identifiers are stable v1 compatibility names.
+Do not rewrite them in persisted objects.
+
+## Canonical identities
+
+Requests and execution plans support RFC 8785 JSON Canonicalization Scheme
+bytes and SHA-256 identities. Use the owning Rust method rather than
+re-serializing with arbitrary map ordering or whitespace.
+
+Artifact and pack validators bind more than file shape. They check references,
+relative paths, array byte ranges, hashes, workflow identity, job identity, and
+stage evidence across objects.
+
+## Run the focused contract
+
+```bash
+node tests/test-compute-schema-contract.mjs
+```
+
+If Bun is available, the same test supports:
+
+```bash
+bun tests/test-compute-schema-contract.mjs
+```
+
+Valid fixtures are complete wire objects under `schemas/compute/fixtures`.
+Invalid fixtures cover representative rejection classes. Use them to understand
+the boundary; do not copy a fixture and bypass Rust validation in production.
+
+For the detailed schema contract, read
+[`schemas/compute/README.md`](https://github.com/SergeiNikolenko/MolComputeKit/blob/main/schemas/compute/README.md).

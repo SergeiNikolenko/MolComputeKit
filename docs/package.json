@@ -1,0 +1,29 @@
+{
+  "name": "molcompute-kit-docs",
+  "version": "0.1.0",
+  "private": true,
+  "engines": {
+    "node": ">=20.9.0"
+  },
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "postbuild": "pagefind --site .next/server/app --output-path public/_pagefind",
+    "start": "next start"
+  },
+  "dependencies": {
+    "next": "15.5.20",
+    "nextra": "4.2.17",
+    "nextra-theme-docs": "4.2.17",
+    "react": "19.1.0",
+    "react-dom": "19.1.0"
+  },
+  "devDependencies": {
+    "pagefind": "1.5.2",
+    "typescript": "5.9.3"
+  },
+  "overrides": {
+    "@theguild/remark-mermaid": "0.3.0",
+    "postcss": "8.5.19"
+  }
+}

@@ -1,0 +1,69 @@
+---
+title: CPU quick start
+description: Score exact packed fingerprints with the deterministic reference implementation.
+---
+
+# CPU quick start
+
+This example compares one 2,048-bit fingerprint with two library records. It
+uses integer intersection and union counts, then converts the exact ratio to an
+`f64` only for display.
+
+```rust filename="src/main.rs"
+use molcompute_kit::{core, framework_info};
+
+fn main() -> Result<(), Box<dyn std::error::Error>> {
+    let versions = framework_info();
+    println!("MolComputeKit {}", versions.framework_version);
+
+    let query = core::Fingerprint2048::from_words([u64::MAX; 32]);
+    let library = [query, core::Fingerprint2048::ZERO];
+    let scores = core::score_tanimoto_query(
+        &query,
+        &library,
+        core::TanimotoQueryOptions::new(8 * 1024 * 1024)?,
+    )?;
+
+    for (index, score) in scores.iter().enumerate() {
+        println!(
+            "record={index} similarity={:.3} intersection={} union={}",
+            score.similarity(),
+            score.intersection,
+            score.union
+        );
+    }
+    Ok(())
+}
+```
+
+Run it with:
+
+```bash
+cargo run
+```
+
+## Why the input is already a fingerprint
+
+`Fingerprint2048` represents a canonical packed `u64[32]` row. MolComputeKit
+does not parse SMILES or decide aromaticity, charge, tautomer, or Morgan
+fingerprint settings. Those are chemistry semantics and belong to your host or
+an adapter such as RDKit.
+
+This separation is deliberate:
+
+1. the host records how the molecule and fingerprint were produced;
+2. MolComputeKit receives a fixed, validated numerical representation;
+3. CPU and Metal implementations operate on the same bytes;
+4. the result can retain the input and engine identities used to produce it.
+
+## Memory is part of the request
+
+`TanimotoQueryOptions::new` requires an explicit byte limit. Other APIs use
+`ResourceLimits` or workflow-specific limits. A limit violation is a rejected
+request, not permission to allocate without a bound.
+
+## Next calculations
+
+The [CPU examples](../guides/examples) page continues with a sparse similarity
+graph, deterministic Butina clustering, rigid alignment, and an RM1 water
+calculation.
