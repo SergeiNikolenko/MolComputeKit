@@ -8,7 +8,7 @@ rust-version.workspace = true
 description = "Isolated authenticated helper service for MolComputeKit Metal execution"
 
 [dependencies]
-base64 = "0.22"
+base64 = "0.23"
 burrete-compute-core = { path = "../burrete-compute-core", version = "0.1.0" }
 burrete-compute-metal = { path = "../burrete-compute-metal", version = "0.1.0" }
 burrete-compute-protocol = { path = "../burrete-compute-protocol", version = "0.1.0" }
